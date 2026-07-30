@@ -7,7 +7,8 @@ interface AuthState {
     token: string | null;
     mobileNumber: string | null;
     isLoggedIn: boolean;
-    setToken: (token: string, mobileNumber: string) => void;
+    email: string | null;
+    setToken: (token: string, mobileNumber: string, email?: string) => void;
     clearToken: () => void;
 }
 
@@ -37,11 +38,12 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             token: null,
             mobileNumber: null,
+            email: null,
             isLoggedIn: false,
-            setToken: (token, mobileNumber) =>
-                set({ token, mobileNumber, isLoggedIn: true }),
+            setToken: (token, mobileNumber, email) =>
+                set({ token, mobileNumber, email: email ?? null, isLoggedIn: true }),
             clearToken: () =>
-                set({ token: null, mobileNumber: null, isLoggedIn: false }),
+                set({ token: null, mobileNumber: null, email: null, isLoggedIn: false }),
         }),
         {
             name: 'auth-storage',

@@ -1,0 +1,52 @@
+export const colors = {
+  primary: "#166534",
+  primaryPressed: "#14532d",
+  primaryForeground: "#ffffff",
+  secondary: "#f59e0b",
+  secondaryPressed: "#d97706",
+  secondaryForeground: "#1f2937",
+  background: "#ffffff",
+  surface: "#f8fafc",
+  border: "#cbd5e1",
+  text: "#0f172a",
+  muted: "#475569",
+  accent: "#dcfce7",
+  danger: "#dc2626",
+};
+
+export const ui = {
+  screen: "flex-1 bg-brand-background",
+  contentPadding: "p-4",
+  card: "rounded-xl border border-brand-border bg-white",
+  iconButton: "h-11 w-11 items-center justify-center rounded-xl border border-brand-border bg-white",
+  screenTitle: "text-3xl font-bold text-black",
+  heroTitle: "text-3xl font-bold text-brand-primary",
+  sectionTitle: "text-xl font-semibold text-black",
+  body: "text-base text-brand-text",
+  bodyMuted: "text-base text-brand-muted",
+  caption: "text-sm text-brand-muted",
+  buttonBase: "min-h-[48px] flex-row items-center justify-center rounded-xl px-4",
+  buttonPrimary: "bg-brand-primary",
+  buttonPrimaryPressed: "bg-brand-primary-pressed",
+  buttonSecondary: "bg-brand-secondary",
+  buttonSecondaryPressed: "bg-brand-secondary-pressed",
+  buttonOutline: "border border-brand-border bg-brand-background",
+  buttonOutlinePressed: "bg-brand-surface",
+  buttonTextPrimary: "text-base font-semibold text-brand-primary-foreground",
+  buttonTextSecondary: "text-base font-semibold text-brand-secondary-foreground",
+  buttonTextOutline: "text-base font-semibold text-brand-primary",
+  input: "min-h-[48px] rounded-xl border border-brand-border bg-white px-4 text-base text-brand-text",
+  inputDisabled: "border-brand-border bg-brand-surface text-brand-muted",
+  inputContainer: "min-h-[44px] rounded-xl border border-brand-border bg-white px-3",
+  overlayCard: "items-center rounded-xl border border-brand-border bg-white px-5 py-4",
+  loadingText: "mt-2 text-sm font-medium text-brand-text",
+  badge: "min-h-[20px] min-w-[20px] rounded-full bg-brand-primary px-1 items-center justify-center",
+  badgeText: "text-[10px] font-semibold text-white text-center",
+  navActive: "bg-brand-accent",
+  navActiveText: "font-semibold text-brand-primary",
+  navText: "text-brand-muted",
+};
+
+export function cx(...parts: (string | false | null | undefined)[]) {
+  return parts.filter(Boolean).join(" ");
+}

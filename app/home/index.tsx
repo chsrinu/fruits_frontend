@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import {
     View,
-    Text,
     TextInput,
     Image,
     FlatList,
     TouchableOpacity,
-    ActivityIndicator,
-    SafeAreaView,
     Keyboard,
+    Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
 import { fetchProducts } from '../api/products';
-import CarouselBanner from '@/app/components/Carousel';
-import AddToCartControl from '@/app/components/AddToCartControl';
+import CarouselBanner from '@/components/Carousel';
+import AddToCartControl from '@/components/AddToCartControl';
 import { useCartStore } from '@/app/stores/cartStore';
 import {getDisplayUnit} from "@/app/utils/helper";
+import { BottomNavigation } from "@/components/BottomNavigation";
+import { useProductStore } from "@/app/stores/productStore";
+import { AppText } from "@/components/ui/AppText";
+import { ui } from "@/app/theme/designSystem";
 
 interface Product {
     productId: number;
@@ -36,41 +39,36 @@ export default function HomeScreen() {
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
     const [shouldShowSuggestions, setShouldShowSuggestions] = useState(true);
-
-    const { items, addToCart, updateQuantity, setCartItems } = useCartStore();
     const router = useRouter();
+    const cachedProducts = useProductStore((state) => state.products);
+    const setProductCatalog = useProductStore((state) => state.setProducts);
+    const shouldRefreshProducts = useProductStore((state) => state.shouldRefreshProducts);
 
-    // Fetch products & rebase cart
+    const { items, addToCart, updateQuantity } = useCartStore();
+    const cartItemCount = items.reduce((total, item) => total + item.quantity, 0);
+    // On mount: use cache immediately, fetch only if stale (> 1h)
     useEffect(() => {
         const handleFetchProducts = async () => {
-            setLoading(true);
+            const hasCachedProducts = cachedProducts.length > 0;
+            const shouldFetch = shouldRefreshProducts(60 * 60 * 1000);
+
+            if (hasCachedProducts) {
+                setProducts(cachedProducts as Product[]);
+                setFilteredProducts(cachedProducts as Product[]);
+            }
+
+            if (!shouldFetch) return;
+
+            setLoading(!hasCachedProducts);
             try {
                 const rawData = await fetchProducts();
-                const data = rawData.data.map(product => ({
+                const data = rawData.data.map((product: Product) => ({
                     ...product,
                     displayUnits: getDisplayUnit(product.units),
                 }));
                 setProducts(data);
                 setFilteredProducts(data);
-
-                // Rebase cart items with fresh product data
-                const updatedCartItems = items
-                    .map((item) => {
-                        const product = data.find((p) => p.productId === item.productId);
-                        if (!product) return null;
-                        return {
-                            ...item,
-                            productName: product.productName,
-                            productImageUrlPath: product.productImageUrlPath,
-                            pricePerUnit: product.pricePerUnit,
-                            units: product.units,
-                            isAvailable: product.isAvailable,
-                            displayUnits: product.displayUnits
-                        };
-                    })
-                    .filter(Boolean) as typeof items;
-
-                setCartItems(updatedCartItems);
+                setProductCatalog(data);
             } catch (err) {
                 console.error('Failed to fetch products', err);
             } finally {
@@ -152,8 +150,8 @@ export default function HomeScreen() {
                     source={{ uri: item.productImageUrlPath }}
                     style={{ width: '100%', height: 100, resizeMode: 'contain' }}
                 />
-                <Text className="text-base font-semibold mt-1">{item.productName}</Text>
-                <Text className="text-sm text-gray-600">${item.pricePerUnit.toFixed(2)}</Text>
+                <AppText className="mt-1 font-semibold">{item.productName}</AppText>
+                <AppText variant="caption">${item.pricePerUnit.toFixed(2)}</AppText>
                 <AddToCartControl
                     quantity={quantity}
                     onAdd={handleAddToCart}
@@ -165,23 +163,47 @@ export default function HomeScreen() {
     };
 
     return (
+        <SafeAreaProvider>
         <SafeAreaView className="flex-1 bg-white">
             <View className="p-4 flex-1">
-                <Text className="text-2xl font-bold mb-2">Home</Text>
+                <AppText variant="title" className="mb-2">Home</AppText>
 
-                {/* Search bar */}
-                <View className="border rounded bg-green-50 px-3 py-2 mb-2 flex-row items-center justify-between">
-                    <TextInput
-                        className="flex-1 text-base"
-                        placeholder="Search for products"
-                        value={search}
-                        onChangeText={setSearch}
-                    />
-                    {search.trim() !== '' && (
-                        <TouchableOpacity onPress={handleClearSearch}>
-                            <Text className="text-xl text-gray-600 px-2">×</Text>
-                        </TouchableOpacity>
-                    )}
+                {/* Search + Cart */}
+                <View className="mb-2 flex-row items-center gap-2">
+                    <View className={`${ui.inputContainer} h-11 flex-1 flex-row items-center justify-between`}>
+                        <TextInput
+                            className="flex-1 text-base text-brand-text"
+                            placeholderTextColor="#64748b"
+                            placeholder="Search for products"
+                            value={search}
+                            onChangeText={setSearch}
+                            style={{
+                                paddingVertical: 0,
+                                ...(Platform.OS === 'android' ? { textAlignVertical: 'center' } : null),
+                            }}
+                        />
+                        {search.trim() !== '' && (
+                            <TouchableOpacity onPress={handleClearSearch}>
+                                <AppText className="px-2 text-xl text-brand-muted">×</AppText>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={() => router.push("/cart" as any)}
+                        className={`${ui.iconButton} relative w-12`}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open cart"
+                    >
+                        <AppText className="text-xl">🛒</AppText>
+                        {cartItemCount > 0 && (
+                            <View className={`absolute -right-3 -top-2 min-w-[18px] items-center justify-center ${ui.badge}`}>
+                                <AppText className={ui.badgeText}>
+                                    {cartItemCount > 99 ? "99+" : cartItemCount}
+                                </AppText>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* Suggestions */}
@@ -189,7 +211,7 @@ export default function HomeScreen() {
                     suggestions.length > 0 &&
                     suggestions.map((s, i) => (
                         <TouchableOpacity key={i} onPress={() => handleSuggestionClick(s)}>
-                            <Text className="text-gray-500 mb-1 ml-1">🔍 {s}</Text>
+                            <AppText variant="caption" className="mb-1 ml-1">🔍 {s}</AppText>
                         </TouchableOpacity>
                     ))}
 
@@ -197,10 +219,8 @@ export default function HomeScreen() {
                 <CarouselBanner />
 
                 {/* Product Grid */}
-                <View className="p-4 flex-1">
-                    {loading ? (
-                        <ActivityIndicator size="large" className="mt-4" />
-                    ) : (
+                <View className="flex-1">
+                    {loading ? null : (
                         <FlatList
                             data={filteredProducts}
                             renderItem={renderItem}
@@ -214,18 +234,8 @@ export default function HomeScreen() {
                 </View>
             </View>
 
-            {/* Bottom Navigation */}
-            <View className="absolute bottom-0 w-full flex-row justify-around py-2 bg-white border-t">
-                <TouchableOpacity onPress={() => router.push('/cart')}>
-                    <Text>🛒</Text>
-                </TouchableOpacity>
-                <TouchableOpacity>
-                    <Text>👤</Text>
-                </TouchableOpacity>
-                <TouchableOpacity>
-                    <Text>💰</Text>
-                </TouchableOpacity>
-            </View>
+            <BottomNavigation />
         </SafeAreaView>
+        </SafeAreaProvider>
     );
 }

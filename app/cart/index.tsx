@@ -1,25 +1,71 @@
 import {
     View,
-    Text,
     Image,
-    TouchableOpacity,
     FlatList,
-    SafeAreaView,
 } from 'react-native';
-import { useCartStore } from '@/app/stores/cartStore';
-import QuantityControl from "@/app/components/QuantityControl";
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { CartItem, useCartStore } from '@/app/stores/cartStore';
+import QuantityControl from "@/components/QuantityControl";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import React from "react";
+import { useRouter } from "expo-router";
+import { AppButton } from "@/components/ui/AppButton";
+import { AppText } from "@/components/ui/AppText";
 
 export default function CartScreen() {
     const items = useCartStore((s) => s.items);
-    console.log("sreeni", items)
+    const router = useRouter();
     const updateQuantity = useCartStore((s) => s.updateQuantity);
+    const hasItems = items.length > 0;
     const subtotal = items.reduce(
         (total, item) => total + item.pricePerUnit * item.quantity,
         0
     );
 
-    const renderItem = ({ item }) => (
+    const handleCheckout = async () => {
+        try {
+            router.push({
+                pathname: "/order/confirm",
+                params: {
+                    subtotal: subtotal,
+                }
+            });
+        } catch (error) {
+            console.log("Checkout error:", error);
+        }
+    };
+
+    // const handleCheckout = async () => {
+    //     try {
+    //         const totalAmount = subtotal;
+
+    //         // Call your API using axios wrapper
+    //         const response = await initiatePayment({
+    //             amount: totalAmount,
+    //             orderId: "TOPUP_" + Date.now()
+    //         });
+
+    //         // Axios returns JSON directly under response.data
+    //         const data = response.data;
+    //         console.log("Razorpay order Initiated:", data);
+
+    //         // Navigate to Payment WebView screen
+    //         router.push({
+    //             pathname: "/payment/webview",
+    //             params: {
+    //                 orderId: data.orderId,
+    //                 amount: data.amount
+    //             }
+    //         });
+
+
+    //     } catch (error) {
+    //         console.log("Checkout error:", error);
+    //     }
+    // };
+
+
+    const renderItem = ({ item }: { item: CartItem }) => (
         <View className="flex-row items-center justify-between p-2 border-b">
             {/* Product Image */}
             <Image
@@ -30,11 +76,11 @@ export default function CartScreen() {
 
             {/* Product Details and Controls */}
             <View className="flex-1 ml-3">
-                <Text className="text-base font-semibold">{item.productName}</Text>
+                <AppText className="text-base font-semibold text-black">{item.productName}</AppText>
 
                 <View className="flex-row justify-between items-center mt-2">
                     {/* Price */}
-                    <Text className="text-sm text-gray-800 font-bold">₹{item.pricePerUnit.toFixed(2)} / {item.displayUnits}</Text>
+                    <AppText className="text-sm font-normal text-black">₹{item.pricePerUnit.toFixed(2)} / {item.displayUnits}</AppText>
 
                     {/* Quantity Control */}
                     <QuantityControl
@@ -48,10 +94,30 @@ export default function CartScreen() {
 
     );
 
+    if (!hasItems) {
+        return (
+            <SafeAreaProvider>
+                <SafeAreaView className="flex-1 bg-white p-4">
+                    <ScreenHeader title="Shopping Cart" />
+                    <View className="flex-1 items-center justify-center px-4">
+                        <AppText variant="title" className="mb-2 text-center">Your cart is empty</AppText>
+                        <AppText variant="bodyMuted" className="mb-6 text-center">
+                            Add some fresh items to continue shopping.
+                        </AppText>
+                        <AppButton
+                            onPress={() => router.replace("/home")}
+                            label="Go Back Home"
+                            className="w-full"
+                        />
+                    </View>
+                </SafeAreaView>
+            </SafeAreaProvider>
+        );
+    }
+
     return (
         <SafeAreaView className="flex-1 bg-white p-4">
-            <Text className="text-2xl font-bold mb-4">Shopping Cart</Text>
-
+            <ScreenHeader title="Shopping Cart" />
             <FlatList
                 data={items}
                 renderItem={renderItem}
@@ -59,15 +125,17 @@ export default function CartScreen() {
                 showsVerticalScrollIndicator={false}
             />
 
-            <View className="border-t pt-4 mt-4">
+            <View className="border-t border-brand-border pt-4 mt-4">
                 <View className="flex-row justify-between mb-4">
-                    <Text className="text-lg font-bold">Subtotal</Text>
-                    <Text className="text-lg font-bold">₹{subtotal}</Text>
+                    <AppText variant="section">Subtotal</AppText>
+                    <AppText className="text-base font-semibold text-black">₹{subtotal}</AppText>
                 </View>
 
-                <TouchableOpacity className="bg-orange-500 py-3 rounded">
-                    <Text className="text-white text-center text-lg font-semibold">Checkout</Text>
-                </TouchableOpacity>
+                <AppButton
+                    onPress={handleCheckout}
+                    label="Checkout"
+                    className="w-full"
+                />
             </View>
         </SafeAreaView>
     );

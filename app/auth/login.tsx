@@ -1,11 +1,17 @@
 // app/auth/login.tsx
-import { useState } from 'react';
-import { View, TextInput, Button, Alert, Text } from 'react-native';
-import { useRouter } from 'expo-router';
-import { sendOtp } from '../api/user';
-import { useMutation } from '@tanstack/react-query';
-import { useAuthStore } from '../stores/authStore';
-import { jwtDecode } from 'jwt-decode';
+import { useEffect, useState } from "react";
+import { Alert, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useMutation } from "@tanstack/react-query";
+import { jwtDecode } from "jwt-decode";
+import { OtpVerification } from "@/components/OtpVerification";
+import { AppButton } from "@/components/ui/AppButton";
+import { AppText } from "@/components/ui/AppText";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { sendOtp } from "../api/user";
+import { completeOtpVerification } from "./completeOtpVerification";
+import { useAuthStore } from "../stores/authStore";
+import { ui } from "@/app/theme/designSystem";
 
 interface JwtPayload {
     exp: number;
@@ -13,69 +19,143 @@ interface JwtPayload {
 }
 
 export default function LoginScreen() {
-    const [mobile, setMobile] = useState('');
-    const router = useRouter();
-    const setToken = useAuthStore((s) => s.setToken);
-    const clearToken = useAuthStore((s) => s.clearToken);
-    const token = useAuthStore((s) => s.token);
+  const [mobile, setMobile] = useState("");
+  const [showInlineOtp, setShowInlineOtp] = useState(false);
+  const [otpResetKey, setOtpResetKey] = useState(0);
+  const router = useRouter();
+  const setToken = useAuthStore((s) => s.setToken);
+  const clearToken = useAuthStore((s) => s.clearToken);
+  const token = useAuthStore((s) => s.token);
 
-    // 🔒 Validate token expiry on mount
-    if (token) {
-        try {
-            const decoded = jwtDecode<JwtPayload>(token);
-            const isExpired = decoded.exp * 1000 < Date.now();
-            if (isExpired) {
-                clearToken();
-            } else {
-                router.replace('/'); // If token is valid, go to home
-            }
-        } catch (err) {
-            console.warn('Invalid token, clearing');
-            clearToken();
-        }
+  useEffect(() => {
+    if (!token) return;
+
+    try {
+      const decoded = jwtDecode<JwtPayload>(token);
+      const isExpired = decoded.exp * 1000 < Date.now();
+      if (isExpired) {
+        clearToken();
+      } else {
+        router.replace("/");
+      }
+    } catch (err) {
+      console.warn("Invalid token, clearing");
+      clearToken();
+    }
+  }, [clearToken, router, token]);
+
+  const sendOtpMutation = useMutation({
+    mutationFn: (mobileNumber: string) => sendOtp(mobileNumber),
+    onError: (error: any) => {
+      console.error("Send OTP Error:", error);
+
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to send OTP. Please try again.";
+
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  const verifyOtpMutation = useMutation({
+    mutationFn: (otp: string) =>
+      completeOtpVerification({
+        mobileNumber: mobile,
+        otp,
+        setToken,
+      }),
+    onSuccess: () => {
+      router.replace("/home");
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || "Failed to verify OTP";
+      Alert.alert("Error", message, [
+        {
+          text: "OK",
+          onPress: () => {
+            setOtpResetKey((current) => current + 1);
+          },
+        },
+      ]);
+    },
+  });
+
+  const requestOtp = async () => {
+    if (mobile.length !== 10) {
+      Alert.alert("Invalid number", "Please enter a valid 10-digit mobile number.");
+      return;
     }
 
-    const { mutate, isPending } = useMutation({
-        mutationFn: () => sendOtp(mobile),
-        onSuccess: () => {
-            router.replace({
-                pathname: "/auth/otp",
-                params: { mobile },
-            });
-        },
-        onError: (error: any) => {
-            console.error('Send OTP Error:', error);
+    try {
+      const response = await sendOtpMutation.mutateAsync(mobile);
+      const isNewUser = response?.data?.isNewUser === true;
 
-            const errorMessage =
-                error?.response?.data?.message || // custom API error
-                error?.message || // fallback JS error
-                'Failed to send OTP. Please try again.';
+      if (isNewUser) {
+        router.replace({
+          pathname: "/auth/otp",
+          params: { mobile, isNewUser: "true" },
+        });
+        return;
+      }
 
-            Alert.alert('Error', errorMessage);
-        },
-    });
+      setShowInlineOtp(true);
+    } catch (error) {
+      // The mutation onError handler already surfaces the failure.
+    }
+  };
 
-    const handleSubmit = () => {
-        if (mobile.length !== 10) {
-            Alert.alert('Invalid number', 'Please enter a valid 10-digit mobile number.');
-            return;
-        }
+  return (
+    <View className={`${ui.screen} justify-center p-6`}>
+      <AppText variant="title" className="mb-2 text-center">Login</AppText>
+      <AppText variant="bodyMuted" className="mb-5 text-center">
+        Enter your mobile number to continue.
+      </AppText>
 
-        mutate();
-    };
+      <AppTextField
+        className={`mb-4 ${showInlineOtp ? ui.inputDisabled : ""}`}
+        editable={!showInlineOtp}
+        keyboardType="numeric"
+        maxLength={10}
+        placeholder="Mobile Number"
+        value={mobile}
+        onChangeText={setMobile}
+      />
 
-    return (
-        <View className="flex-1 justify-center p-4 bg-white">
-            <Text className="text-2xl mb-4 text-center">Enter your mobile number</Text>
-            <TextInput
-                className="border border-gray-400 p-3 rounded mb-4"
-                keyboardType="numeric"
-                maxLength={10}
-                placeholder="Mobile Number"
-                value={mobile}
-                onChangeText={setMobile}
-            />
-            <Button title={isPending ? 'Sending OTP...' : 'Send OTP'} onPress={handleSubmit} disabled={isPending} />
-        </View>
-    );
+      {!showInlineOtp ? (
+        <AppButton
+          onPress={requestOtp}
+          loading={sendOtpMutation.isPending}
+          label={sendOtpMutation.isPending ? "Sending OTP..." : "Send OTP"}
+        />
+      ) : (
+        <>
+          <OtpVerification
+            helperText={`Enter the 4-digit OTP sent to ${mobile}.`}
+            isSubmitting={verifyOtpMutation.isPending}
+            mobileNumber={mobile}
+            onComplete={(otp) => {
+              console.log("[LoginScreen] OTP onComplete received", {
+                mobile,
+                otp,
+              });
+              verifyOtpMutation.mutate(otp);
+            }}
+            onResend={requestOtp}
+            resetKey={otpResetKey}
+          />
+          <AppButton
+            className="mt-5"
+            variant="outline"
+            size="sm"
+            onPress={() => {
+              setShowInlineOtp(false);
+              setOtpResetKey((current) => current + 1);
+            }}
+            label="Use a different mobile number"
+          />
+        </>
+      )}
+    </View>
+  );
 }

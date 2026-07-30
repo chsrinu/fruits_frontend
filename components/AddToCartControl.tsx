@@ -1,7 +1,7 @@
 // components/AddToCartControl.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import QuantityControl from "@/app/components/QuantityControl";
+import QuantityControl from "@/components/QuantityControl";
+import { AppButton } from "@/components/ui/AppButton";
 
 interface Props {
     quantity: number;
@@ -22,11 +22,13 @@ export default function AddToCartControl({ quantity, onAdd, onIncrease, onDecrea
     }
 
     return (
-        <TouchableOpacity
+        <AppButton
             onPress={onAdd}
-            className="border p-1 rounded mt-2 bg-green-100"
-        >
-            <Text className="text-center text-sm text-green-700">Add to cart</Text>
-        </TouchableOpacity>
+            label="Add to cart"
+            variant="primary"
+            size="sm"
+            className="mt-2"
+            textClassName="text-sm"
+        />
     );
 }

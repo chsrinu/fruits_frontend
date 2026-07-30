@@ -10,3 +10,5 @@ export const getDisplayUnit = (unit: string): string => {
     };
     return unitMap[unit.toUpperCase()] || unit.toLowerCase();
 };
+
+export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
